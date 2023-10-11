@@ -1,43 +1,78 @@
 import type { NextPage } from "next";
 import Head from "next/head";
-import Image from "next/image";
-import { Dialog, Transition } from "@headlessui/react";
-import { Fragment, createRef } from "react";
-import Slider from "rc-slider";
 import { MapTitle } from "@/components/MapTitle";
 import { FilterButton } from "@/components/FilterButton";
 import { CloseButton } from "../components/CloseButton";
 import { signintrack, uploadMapboxTrack } from "../components/mapboxtrack";
-import TooltipSlider, { handleRender } from "../components/TooltipSlider";
-import { getAuth, signInWithCustomToken } from "firebase/auth";
 import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import MapboxLanguage from "@mapbox/mapbox-gl-language";
 import Nav from "../components/nav";
 //import { CloseButton } from "@/components/CloseButton";
 import { MantineProvider, Checkbox } from "@mantine/core";
 import React, { useEffect, useState, useRef } from "react";
-import { initializeApp } from "firebase/app";
-
-import Icon from "@mdi/react";
-import { mdiPlay } from "@mdi/js";
-import { mdiPause, mdiSkipNext, mdiSkipPrevious } from "@mdi/js";
-
 import CouncilDist from "./CouncilDistricts.json";
-import { auth, signInWithGoogle, signOutOfApp } from "./../components/firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
 
 const councildistricts = require("./CouncilDistricts.json");
 const citybounds = require("./citybounds.json");
 // @ts-ignore: Unreachable code error
 import * as turf from "@turf/turf";
-import { datadogRum } from "@datadog/browser-rum";
 
 // added the following 6 lines.
 import mapboxgl from "mapbox-gl";
 
-import { assertDeclareExportAllDeclaration } from "@babel/types";
+const arrestsByDistrict = require("./LapdArrests2019.json");
 
-import { GeoJsonProperties, MultiPolygon, Polygon } from "geojson";
+function assignPointsToDistrict(points: any, districtJson: any) {
+  const districtPolygons = districtJson.features.map((feature: any) => feature.geometry.coordinates[0][0]);
+
+  const pointDistricts = points.map((point: any) => {
+    for (let i = 0; i < districtPolygons.length; i++) {
+      const polygon = districtPolygons[i];
+      const [pointInside, reportNum] = insidePolygon(point, polygon);
+      if (pointInside) {
+        let distName = Number(districtJson.features[i].properties.district);
+        return {"Report ID": reportNum, "CD": distName};
+      }
+    }
+  });
+  return pointDistricts;
+}
+
+
+function insidePolygon(point: any, polygon: any): [boolean, number] {
+  const x = point.lon;
+  const y = point.lat;
+  const id = point.id;
+
+  let inside = false;
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+
+    const intersect = ((yi > y) !== (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+
+    if (intersect) {
+      inside = !inside;
+    }
+  }
+  return [inside, id];
+}
+
+const locationPoints = arrestsByDistrict.map((arrest: any) => {
+  return {
+    id: arrest["Report ID"],
+    lon: arrest["LON"],
+    lat: arrest["LAT"],
+  };
+});
+
+const districtNumbers = assignPointsToDistrict(locationPoints, councildistricts);
+
+console.log("districtNumbers", districtNumbers);
+var jsonString = JSON.stringify(districtNumbers);
+console.log(jsonString);
 
 function isTouchScreen() {
   return window.matchMedia("(hover: none)").matches;
@@ -130,36 +165,6 @@ const Home: NextPage = () => {
     }
   };
 
-  const datadogconfig: any = {
-    applicationId: "54ed9846-68b0-4811-a47a-7330cf1828a0",
-    clientToken: "pub428d48e3143310cf6a9dd00003773f12",
-    site: "datadoghq.com",
-    service: "beds",
-    env: "prod",
-    // Specify a version number to identify the deployed version of your application in Datadog
-    // version: '1.0.0',
-
-    sessionSampleRate: 100,
-    sessionReplaySampleRate: 100,
-    trackUserInteractions: true,
-    trackResources: true,
-    trackLongTasks: true,
-    defaultPrivacyLevel: "allow",
-  };
-
-  datadogRum.init(datadogconfig);
-
-  datadogRum.startSessionReplayRecording();
-
-  const setsliderMonth = (event: Event, newValue: number | number[]) => {
-    setsliderMonthAct(newValue as number[]);
-  };
-
-  const setsliderMonthVerTwo = (input: any) => {
-    console.log(input);
-    setsliderMonthAct(input);
-  };
-
   function turfify(polygon: any) {
     var turffedpolygon;
 
@@ -172,29 +177,6 @@ const Home: NextPage = () => {
     }
 
     return turffedpolygon;
-  }
-
-  function polygonInWhichCd(polygon: any) {
-    if (typeof polygon.properties.name === "string") {
-      if (cacheofcdsfromnames[polygon.properties.name]) {
-        return cacheofcdsfromnames[polygon.properties.name];
-      } else {
-        var turffedpolygon = turfify(polygon);
-
-        const answerToReturn = councildistricts.features.find(
-          (eachItem: any) => {
-            //turf sucks for not having type checking, bypasses compile error Property 'booleanIntersects' does not exist on type 'TurfStatic'.
-            //yes it works!!!! it's just missing types
-            // @ts-ignore: Unreachable code error
-            return turf.booleanIntersects(turfify(eachItem), turffedpolygon);
-          }
-        );
-
-        cacheofcdsfromnames[polygon.properties.name] = answerToReturn;
-
-        return answerToReturn;
-      }
-    }
   }
 
   var [hasStartedControls, setHasStartedControls] = useState(false);
