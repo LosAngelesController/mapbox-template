@@ -23,7 +23,9 @@ import mapboxgl from "mapbox-gl";
 const arrestsByDistrict = require("./LapdArrests2019.json");
 
 function assignPointsToDistrict(points: any, districtJson: any) {
-  const districtPolygons = districtJson.features.map((feature: any) => feature.geometry.coordinates[0][0]);
+  const districtPolygons = districtJson.features.map(
+    (feature: any) => feature.geometry.coordinates[0][0]
+  );
 
   const pointDistricts = points.map((point: any) => {
     for (let i = 0; i < districtPolygons.length; i++) {
@@ -31,13 +33,12 @@ function assignPointsToDistrict(points: any, districtJson: any) {
       const [pointInside, reportNum] = insidePolygon(point, polygon);
       if (pointInside) {
         let distName = Number(districtJson.features[i].properties.district);
-        return {"Report ID": reportNum, "CD": distName};
+        return { "Report ID": reportNum, CD: distName };
       }
     }
   });
   return pointDistricts;
 }
-
 
 function insidePolygon(point: any, polygon: any): [boolean, number] {
   const x = point.lon;
@@ -50,8 +51,8 @@ function insidePolygon(point: any, polygon: any): [boolean, number] {
     const [xi, yi] = polygon[i];
     const [xj, yj] = polygon[j];
 
-    const intersect = ((yi > y) !== (yj > y)) &&
-      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    const intersect =
+      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
 
     if (intersect) {
       inside = !inside;
@@ -68,7 +69,10 @@ const locationPoints = arrestsByDistrict.map((arrest: any) => {
   };
 });
 
-const districtNumbers = assignPointsToDistrict(locationPoints, councildistricts);
+const districtNumbers = assignPointsToDistrict(
+  locationPoints,
+  councildistricts
+);
 
 console.log("districtNumbers", districtNumbers);
 var jsonString = JSON.stringify(districtNumbers);
@@ -760,7 +764,9 @@ const Home: NextPage = () => {
   sm:top-auto sm:bottom-auto sm:left-auto 
   sm:right-auto flex flex-col gap-y-2"
             >
-              {filterpanelopened === false && (<FilterButton setfilterpanelopened={setfilterpanelopened} />)}
+              {filterpanelopened === false && (
+                <FilterButton setfilterpanelopened={setfilterpanelopened} />
+              )}
               <div
                 className={`
               ${
